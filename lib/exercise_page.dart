@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class ExercisePage extends StatefulWidget {
@@ -10,77 +11,111 @@ class ExercisePage extends StatefulWidget {
 
 class _ExercisePageState extends State<ExercisePage> {
   late YoutubePlayerController controller;
-
-  @override
-  void deactivate() {
-    controller.pause(); // Pause the video before navigating away
-    super.deactivate();
-  }
-
-  @override
-  void dispose() {
-    controller.dispose(); // Dispose of the controller to free resources
-    super.dispose();
-  }
+  bool isFullScreen = false;
 
   @override
   void initState() {
     super.initState();
     const url = 'https://youtu.be/IW7oU6O3Atc?si=pP3kIvN78zFrqfRc';
     controller = YoutubePlayerController(
-        initialVideoId: YoutubePlayer.convertUrlToId(url)!,
-        flags: const YoutubePlayerFlags(
-          mute: false,
-          loop: false,
-          autoPlay: false,
-        ));
-  }
+      initialVideoId: YoutubePlayer.convertUrlToId(url)!,
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+      ),
+    );
 
-  void _forceStopAndGoBack(BuildContext context) {
-    // Forcefully stop the video or any animations
-    if (controller.value.isPlaying) {
-      controller.pause(); // Pause the video if playing
-    }
+    // Lock the screen to landscape at the start
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeRight,
+      DeviceOrientation.landscapeLeft,
+    ]);
 
-    // After stopping the animation, navigate back
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Navigator.pop(context); // Safely pop after the frame completes
+    // Hide system UI
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // Add listener to detect full-screen changes
+    controller.addListener(() {
+      if (controller.value.isFullScreen != isFullScreen) {
+        setState(() {
+          isFullScreen = controller.value.isFullScreen;
+          if (isFullScreen) {
+            // If entering full screen, keep landscape orientation
+            SystemChrome.setPreferredOrientations([
+              DeviceOrientation.landscapeRight,
+              DeviceOrientation.landscapeLeft,
+            ]);
+          } else {
+            // Stay in landscape mode even after exiting full screen
+            SystemChrome.setPreferredOrientations([
+              DeviceOrientation.landscapeRight,
+              DeviceOrientation.landscapeLeft,
+            ]);
+          }
+        });
+      }
+    });
+
+    controller.addListener(() {
+      if (controller.value.playerState == PlayerState.ended) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              // Handle the case where there's no route to pop
+              Navigator.pushReplacementNamed(
+                  context, '/'); // Or your home page route
+            }
+          }
+        });
+      }
     });
   }
 
   @override
-  Widget build(BuildContext context) => YoutubePlayerBuilder(
-      player: YoutubePlayer(controller: controller),
-      builder: (context, player) => Scaffold(
-          appBar: AppBar(
-            title: const Text('Exercise Video'),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () {
-                _forceStopAndGoBack(context); // Force stop and navigate back
-              },
-            ),
-          ),
-          body: Column(
-            children: [
-              Expanded(
-                child: Center(
-                  // Rotating the video player 90 degrees clockwise
-                  child: Transform.rotate(
-                    angle: 1.5708, // 90 degrees in radians (π/2)
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9, // Maintain video aspect ratio
-                      child: player,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              _forceStopAndGoBack(context); // Force stop and navigate back
+  void dispose() {
+    controller.dispose();
+
+    // Reset orientation to portrait when the page is closed
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+
+    // Show system UI again
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: YoutubePlayerBuilder(
+          player: YoutubePlayer(
+            controller: controller,
+            showVideoProgressIndicator: true,
+            onReady: () {
+              controller.addListener(() {
+                if (controller.value.isFullScreen != isFullScreen) {
+                  setState(() {
+                    isFullScreen = controller.value.isFullScreen;
+                  });
+                }
+              });
             },
-            child: const Icon(Icons.stop),
-          )));
+          ),
+          builder: (context, player) {
+            return Stack(
+              children: [
+                Positioned.fill(child: player),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
 }

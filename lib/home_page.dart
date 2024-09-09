@@ -181,13 +181,6 @@ class _HomePageState extends State<HomePage> {
             else
               const Text("No device found"),
             const SizedBox(height: 20),
-            // ElevatedButton(
-            // onPressed: isConnecting
-            //     ? null
-            //     : _discoverDevices, // Disable button if connecting
-            //   child:
-            //       Text(isConnected ? "Connected" : "Select and Connect Device"),
-            // ),
             Center(
               child: Container(
                 width: 200.0, // Set the width of the button
@@ -232,6 +225,10 @@ class _HomePageState extends State<HomePage> {
             Navigator.pushNamed(context, '/exercise');
           });
         },
+        child: const Icon(
+          Icons.run_circle_sharp,
+          size: 40,
+        ),
       ),
     );
   }
