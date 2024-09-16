@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,11 +18,14 @@ class _HomePageState extends State<HomePage> {
   bool isConnecting = false;
   bool isConnected = false;
   List<BluetoothDevice> _devicesList = [];
+  // FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+  //     FlutterLocalNotificationsPlugin();
 
   @override
   void initState() {
     super.initState();
     _autoConnectDevice();
+    initializeNotifications();
   }
 
   Future<void> _requestBluetoothPermissions() async {
@@ -165,6 +169,77 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  // const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  // const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+  // await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+  void initializeNotifications() async {
+    var initializationSettingsAndroid =
+        const AndroidInitializationSettings('@mipmap/ic_launcher');
+    var initializationSettings =
+        InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: onDidReceiveNotificationResponse,
+    );
+
+    // Create the notification channel
+    createNotificationChannel();
+  }
+
+  void createNotificationChannel() async {
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'exercise_channel',
+      'Exercise Notifications',
+      description: 'This channel is for exercise-related notifications',
+      importance: Importance.max,
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+    print('Notification channel created');
+  }
+
+  void sendLocalNotification(String message) async {
+    try {
+      var androidPlatformChannelSpecifics = const AndroidNotificationDetails(
+        'exercise_channel',
+        'Exercise Notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+      );
+
+      var platformChannelSpecifics =
+          NotificationDetails(android: androidPlatformChannelSpecifics);
+
+      await flutterLocalNotificationsPlugin.show(
+          0, 'RayBud Notification', message, platformChannelSpecifics);
+      print('Notification sent successfully');
+    } catch (e) {
+      print('Error sending notification: $e');
+    }
+  }
+
+  void onDidReceiveNotificationResponse(
+      NotificationResponse notificationResponse) async {
+    if (notificationResponse.payload != null) {
+      // Handle the notification response
+      print(notificationResponse.payload);
+      Navigator.pushNamed(context, '/exercise');
+      // if (notificationResponse.payload == '') {
+      //   print("go to exercise page");
+      //   Navigator.pushNamed(context, '/exercise');
+      // } else {
+      //   print("Unhandled payload: ${notificationResponse.payload}");
+      // }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -221,9 +296,10 @@ class _HomePageState extends State<HomePage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.pushNamed(context, '/exercise');
-          });
+          sendLocalNotification("Time to start exercise!");
+          // WidgetsBinding.instance.addPostFrameCallback((_) {
+          //   Navigator.pushNamed(context, '/exercise');
+          // });
         },
         child: const Icon(
           Icons.run_circle_sharp,
